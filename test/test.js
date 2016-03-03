@@ -8,8 +8,9 @@ import * as cheerio from 'cheerio'
 import { minify } from "html-minifier"
 
 describe('decorators', function(){
+    this.slow(100);
     describe("string", function(){
-        it("should minify html string",function(){
+        it("should cook string",function(){
             let resultCooked = ""
             var result = transformFileSync("./test/target/templateLiteral.js",{
                 plugins:[
@@ -17,8 +18,8 @@ describe('decorators', function(){
                         let cooked = minify(content,{
                             collapseWhitespace:true
                         });
-                        //console.log("before",content)
-                        //console.log("cooked",cooked)
+                        console.log("before cook",content)
+                        console.log("cook success!",cooked)
                         expect(content).to.be.a('string');
                         return resultCooked = cooked
                     }}]
@@ -27,7 +28,7 @@ describe('decorators', function(){
             //expect(result.code).to.be.include(resultCooked)
         })
 
-        it("should minify html string ,too!",function(){
+        it("should cook string ,too!",function(){
             var result = transformFileSync("./test/target/stringLiteral.js",{
                 plugins:[
                     ["../index.js",{cook:function(content){
@@ -41,7 +42,7 @@ describe('decorators', function(){
             });
         })
 
-        it("should minify html string ,also!",function(){
+        it("should cook string ,also!",function(){
             var result = transformFileSync("./test/target/binaryLiteral.js",{
                 plugins:[
                     ["../index.js",{cook:function(content){
@@ -50,6 +51,20 @@ describe('decorators', function(){
                         });
                         expect(content).to.be.a('string');
                         return cooked
+                    }}]
+                ]
+            });
+        })
+    })
+
+    describe("scoped", function(){
+        it("shouldn't cook because __cook is scoped",function(){
+            var result = transformFileSync("./test/target/scokedCookFunction.js",{
+                plugins:[
+                    ["../index.js",{cook:function(content){
+                        console.log(content)
+                        expect(content).to.not.be.a('string');
+                        return content
                     }}]
                 ]
             });

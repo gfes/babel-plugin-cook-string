@@ -11,7 +11,7 @@
  *
  * @compile
  * plugins:[
- *    ["cook-string",{cook:function(content){
+ *    ["cook-string",{cook:function(content,fileName){
  *      ...
  *      return dosomething(content)
  *    }}]
@@ -20,8 +20,11 @@
  */
 
 const crypto = require("crypto");
-const SPLITERID = crypto.randomBytes(20).toString('hex');
+const objectPath = require("object-path")
+
+const SPLITERID = "[expression]"+crypto.randomBytes(20).toString('hex').substring(10,20);
 const SPLITER = "${"+SPLITERID+"...}"
+const APINAME = "__cook";
 
 module.exports = function(babel){
     let types = babel.types;
@@ -29,23 +32,24 @@ module.exports = function(babel){
     const visitor = {
         CallExpression: function(path, state) {
             let options = state.opts;
-            let cookPipeline = options.cook
+            if(typeof options.cook !== "function")return;
 
-            if(typeof cookPipeline !== "function")return;
-
-            if(path.node.callee.name==="__cook"){
+            if(path.node.callee.name===APINAME && !path.scope.hasOwnBinding/**hasBinding??**/(APINAME)){
                 let htmlLiteral = path.node["arguments"][0];
                 //let compileOptions = ppath.get('arguments')[1];
 
+                let fileName = objectPath.get(state,"file.opts.filename");
+                let cookFn = cookPipeline(options.cook,fileName);
+
                 if(types.isTemplateLiteral(htmlLiteral)){
-                    return path.replaceWith(cookTemplateLiteral(htmlLiteral,cookPipeline))
+                    return path.replaceWith(cookTemplateLiteral(htmlLiteral,cookFn))
                 }else if(types.isStringLiteral(htmlLiteral)){
-                    htmlLiteral.value = cookPipeline(htmlLiteral.value);
+                    htmlLiteral.value = cookFn(htmlLiteral.value);
                     return path.replaceWith(htmlLiteral)
                 }else if(types.isBinaryExpression(htmlLiteral)){
                     let literalArray = binaryExpressionToArray(htmlLiteral);
                     if(literalArray.some(literal=>types.isTemplateLiteral(literal)||types.isStringLiteral(literal))){
-                        let literal = cookTemplateLiteral(literalArrayToTemplateLiteral(literalArray),cookPipeline)
+                        let literal = cookTemplateLiteral(literalArrayToTemplateLiteral(literalArray),cookFn)
                         return path.replaceWith(literal)
                     }
                 }
@@ -57,8 +61,11 @@ module.exports = function(babel){
         visitor: visitor
     };
 
+    function cookPipeline(cookFn,fileName){
+        return input => cookFn(input,fileName);
+    }
+
     function cookTemplateLiteral(literal,cookFn){
-        //console.log(literal.expressions)
         let quasisRawsArray = literal.quasis.map(quasi=>quasi.value.raw);
         let quasisRaw = quasisRawsArray.reduce((final ,curr, i)=>final+(i?SPLITER:"")+curr,"")
 
