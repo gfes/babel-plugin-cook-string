@@ -20,6 +20,7 @@
  */
 
 const crypto = require("crypto");
+const generate = require("babel-generator").default;
 const objectPath = require("object-path")
 
 const SPLITERID = "[expression]"+crypto.randomBytes(20).toString('hex').substring(10,20);
@@ -34,12 +35,18 @@ module.exports = function(babel){
             let options = state.opts;
             if(typeof options.cook !== "function")return;
 
-            if(path.node.callee.name===APINAME && !path.scope.hasOwnBinding/**hasBinding??**/(APINAME)){
+            if(path.node.callee.name===APINAME){
+
+                if(path.scope.hasOwnBinding/**hasBinding??**/(APINAME))return;
+
+                //传入cook选项
                 let htmlLiteral = path.node["arguments"][0];
-                //let compileOptions = ppath.get('arguments')[1];
+                let compileOptions = cookOptionsFilter(path.node["arguments"][1]);
+                let compileOptionsGenterate = generate(compileOptions);
+                let compileOptionsObject = tryEval(compileOptionsGenterate.code);
 
                 let fileName = objectPath.get(state,"file.opts.filename");
-                let cookFn = cookPipeline(options.cook,fileName);
+                let cookFn = cookPipeline(options.cook,fileName,compileOptionsObject);
 
                 if(types.isTemplateLiteral(htmlLiteral)){
                     return path.replaceWith(cookTemplateLiteral(htmlLiteral,cookFn))
@@ -53,6 +60,8 @@ module.exports = function(babel){
                         return path.replaceWith(literal)
                     }
                 }
+
+                return path.replaceWith(types.stringLiteral("undefined"))
             }
         }
     }
@@ -61,8 +70,36 @@ module.exports = function(babel){
         visitor: visitor
     };
 
-    function cookPipeline(cookFn,fileName){
-        return input => cookFn(input,fileName);
+    function tryEval(code){
+        try {
+            return eval("("+code+")")
+        }catch (e){
+        }
+        return {}
+    }
+
+    function cookOptionsFilter(compileOptions){
+        if(!types.isObjectExpression(compileOptions) || compileOptions.properties.length===0){
+            return types.objectExpression([])
+        }
+
+        //cookOptionOnlyAccept string or boolean or number
+        let properties = compileOptions.properties.filter(prop=>{
+            if( types.isObjectProperty(prop) ){
+                if(types.isBooleanLiteral(prop.value)
+                    || types.isStringLiteral(prop.value)
+                    || types.NumericLiteral(prop.value)
+                ){
+                    return true
+                }
+            }
+        })
+
+        return types.objectExpression(properties)
+    }
+
+    function cookPipeline(cookFn,fileName,options){
+        return input => cookFn(input,fileName,options);
     }
 
     function cookTemplateLiteral(literal,cookFn){

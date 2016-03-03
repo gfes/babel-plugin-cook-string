@@ -62,8 +62,21 @@ describe('decorators', function(){
             var result = transformFileSync("./test/target/scokedCookFunction.js",{
                 plugins:[
                     ["../index.js",{cook:function(content){
-                        console.log(content)
+                        //console.log(content)
                         expect(content).to.not.be.a('string');
+                        return content
+                    }}]
+                ]
+            });
+        })
+    })
+
+    describe("options", function(){
+        it("should get cook options",function(){
+            var result = transformFileSync("./test/target/cookOptions.js",{
+                plugins:[
+                    ["../index.js",{cook:function(content,fileName,options){
+                        expect(options.ishtml).to.be.true;
                         return content
                     }}]
                 ]
