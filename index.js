@@ -99,7 +99,16 @@ module.exports = function(babel){
     }
 
     function cookPipeline(cookFn,fileName,options){
-        return input => cookFn(input,fileName,options);
+        return input => {
+            let result = cookFn(input,fileName,options);
+            if(typeof result!=="string"){
+                if(typeof result==="number" || typeof result==="boolean"){
+                    return result+"";
+                }
+                return "";
+            }
+            return result;
+        }
     }
 
     function cookTemplateLiteral(literal,cookFn){
